@@ -10,19 +10,28 @@ This project provides a ready-to-use logging infrastructure that:
 - Stores logs in Elasticsearch with daily indices
 - Visualizes data through Kibana dashboards
 - Generates realistic web traffic logs from multiple geographic regions
+- **Provides a REST API to control log generation in real-time**
+- **Simulates DDoS attacks for testing and demonstration**
 
 ## Architecture
 
 ```
-┌─────────────────┐
-│  Log Generator  │ ──(GELF/UDP)──┐
-└─────────────────┘                │
-                                   ▼
-┌─────────────────┐         ┌──────────┐         ┌────────────────┐
-│     Kibana      │ ◄────── │ Logstash │ ──────► │ Elasticsearch  │
-│   (Port 5601)   │         │(Port 5000│         │  (Port 9200)   │
-└─────────────────┘         │Port 12201)│        └────────────────┘
-                            └──────────┘
+┌─────────────────────────┐
+│    Log Generator        │ ──(GELF/UDP)──┐
+│  Port 8000 (API)        │                │
+└─────────────────────────┘                │
+         ▲                                 ▼
+         │                          ┌──────────┐         ┌────────────────┐
+    Management API                  │ Logstash │ ──────► │ Elasticsearch  │
+  (update_interval,                 │(Port 5000│         │  (Port 9200)   │
+   simulate_ddos)                   │Port 12201)│        └────────────────┘
+                                    └──────────┘                 │
+                                         │                       │
+                                         ▼                       ▼
+                                  ┌─────────────────────────────────┐
+                                  │          Kibana                 │
+                                  │        (Port 5601)              │
+                                  └─────────────────────────────────┘
 ```
 
 ## Prerequisites
@@ -69,6 +78,20 @@ Wait a few moments for Kibana to initialize (usually 30-60 seconds).
 2. Select the `webapp-logs-*` index pattern
 3. You should see logs flowing in real-time
 
+### 5. Try the Log Generator API (Optional)
+
+Test the management API:
+```bash
+# Check API status
+curl http://localhost:8000/
+
+# Speed up log generation
+./update-interval.sh 0.1 0.3
+
+# Simulate a 30-second DDoS attack from Asia
+./simulate-ddos.sh 30 Asia
+```
+
 ## Services
 
 ### Elasticsearch
@@ -93,6 +116,7 @@ Wait a few moments for Kibana to initialize (usually 30-60 seconds).
 - **URL**: http://localhost:5601
 
 ### Log Generator
+- **Port**: 8000 (Management API)
 - **Purpose**: Generates realistic web application logs
 - **Log Format**: JSON with structured fields
 - **Geographic Distribution**: 
@@ -102,7 +126,8 @@ Wait a few moments for Kibana to initialize (usually 30-60 seconds).
   - Africa: 20%
   - Australia/Oceania: 10%
   - North America: 10%
-- **Log Rate**: ~1-5 logs per second (randomized)
+- **Log Rate**: ~1-5 logs per second (configurable via API)
+- **API Documentation**: http://localhost:8000/docs
 
 ## Log Structure
 
@@ -136,6 +161,88 @@ Each generated log entry contains:
 After Logstash processing, additional fields are added:
 - `client.geo.*` - Geographic information (country, city, coordinates)
 - `user_agent.parsed.*` - Parsed browser and OS information
+
+## Log Generator API
+
+The log generator exposes a REST API on port 8000 for runtime configuration and simulation.
+
+### API Endpoints
+
+#### GET /
+Get API status and current configuration.
+
+```bash
+curl http://localhost:8000/
+```
+
+#### GET /status
+Get detailed generator status including DDoS simulation state.
+
+```bash
+curl http://localhost:8000/status
+```
+
+#### POST /update_interval
+Update the log generation interval (time between log entries).
+
+**Using the shell script:**
+```bash
+./update-interval.sh <min_interval> <max_interval>
+
+# Example: Generate logs every 0.1 to 0.5 seconds (faster)
+./update-interval.sh 0.1 0.5
+
+# Example: Generate logs every 1 to 3 seconds (slower)
+./update-interval.sh 1.0 3.0
+```
+
+**Using curl directly:**
+```bash
+curl -X POST http://localhost:8000/update_interval \
+  -H "Content-Type: application/json" \
+  -d '{"min_interval": 0.1, "max_interval": 0.5}'
+```
+
+#### POST /simulate_ddos
+Simulate a DDoS attack with thousands of requests from a single region.
+
+**Using the shell script:**
+```bash
+./simulate-ddos.sh <duration_seconds> [region]
+
+# Example: 30-second DDoS from random region
+./simulate-ddos.sh 30
+
+# Example: 60-second DDoS from Asia
+./simulate-ddos.sh 60 Asia
+```
+
+**Available regions:**
+- Europe
+- Asia
+- South America
+- Africa
+- Australia
+- North America
+
+**Using curl directly:**
+```bash
+# Random region
+curl -X POST http://localhost:8000/simulate_ddos \
+  -H "Content-Type: application/json" \
+  -d '{"duration_seconds": 30}'
+
+# Specific region
+curl -X POST http://localhost:8000/simulate_ddos \
+  -H "Content-Type: application/json" \
+  -d '{"duration_seconds": 60, "region": "Asia"}'
+```
+
+### Interactive API Documentation
+
+FastAPI provides automatic interactive documentation:
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
 
 ## Common Operations
 
@@ -265,23 +372,36 @@ docker-compose logs <service-name>
 
 - `docker-compose.yml` - Service definitions and configuration
 - `logstash/pipeline/logstash.conf` - Logstash pipeline configuration
-- `log-generator/generate_logs.py` - Log generation script
+- `log-generator/log_generator.py` - Core log generation logic
+- `log-generator/api.py` - FastAPI application for management
 - `log-generator/Dockerfile` - Log generator container image
+- `log-generator/requirements.txt` - Python dependencies
 - `remove-volumes.sh` - Script to clean up volumes
+- `update-interval.sh` - Script to update log generation interval
+- `simulate-ddos.sh` - Script to simulate DDoS attacks
 
 ## Customization
 
 ### Modify Log Generation Rate
 
-Edit `log-generator/generate_logs.py`:
-```python
-# Change the sleep interval (line ~120)
-time.sleep(random.uniform(0.2, 1.5))  # Adjust these values
+**Recommended: Use the API** (no restart required):
+```bash
+./update-interval.sh 0.1 0.5
 ```
+
+**Alternative: Edit code** (requires rebuild):
+Edit `log-generator/log_generator.py` and change the default values in the `LogGeneratorConfig` class:
+```python
+class LogGeneratorConfig:
+    def __init__(self):
+        self.min_interval = 0.2  # Change these
+        self.max_interval = 1.5  # Change these
+```
+Then rebuild: `docker-compose up --build -d log-generator`
 
 ### Add Custom Fields to Logs
 
-Edit `log-generator/generate_logs.py` in the `generate_log_entry()` function to add new fields to the `log_data` dictionary.
+Edit `log-generator/log_generator.py` in the `generate_log_entry()` function to add new fields to the `log_data` dictionary.
 
 ### Change Index Pattern
 
@@ -324,6 +444,52 @@ By default, logs are stored indefinitely. To implement retention policies:
 3. **Use persistent volumes** for production data
 
 4. **Enable security** (X-Pack) in Elasticsearch
+
+## Quick Reference
+
+### Essential Commands
+```bash
+# Start the stack
+docker-compose up -d
+
+# Stop the stack
+docker-compose down
+
+# View logs
+docker-compose logs -f
+
+# Rebuild log generator
+docker-compose up --build -d log-generator
+
+# Remove all data
+./remove-volumes.sh
+```
+
+### Management Scripts
+```bash
+# Update log generation speed
+./update-interval.sh <min> <max>
+
+# Simulate DDoS attack
+./simulate-ddos.sh <duration> [region]
+```
+
+### API Endpoints
+- **API Docs**: http://localhost:8000/docs
+- **Kibana**: http://localhost:5601
+- **Elasticsearch**: http://localhost:9200
+
+### Useful Queries
+```bash
+# Check Elasticsearch health
+curl http://localhost:9200/_cluster/health?pretty
+
+# List indices
+curl http://localhost:9200/_cat/indices?v
+
+# Check log generator status
+curl http://localhost:8000/status
+```
 
 ## License
 

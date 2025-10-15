@@ -6,10 +6,14 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the application script
-COPY generate_logs.py .
+# Copy the application files
+COPY log_generator.py .
+COPY api.py .
 
 RUN apk add --no-cache netcat-openbsd
 
-# Run the script when the container starts
-CMD ["python", "-u", "generate_logs.py"]
+# Expose API port
+EXPOSE 8000
+
+# Run the API server when the container starts
+CMD ["python", "-u", "api.py"]
