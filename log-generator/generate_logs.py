@@ -1,6 +1,7 @@
 import time
 import json
 import random
+import sys
 from datetime import datetime
 from faker import Faker
 
@@ -57,7 +58,7 @@ if __name__ == "__main__":
     while True:
         log_entry = generate_log_entry()
         # Print the log entry as a JSON string to stdout
-        print(json.dumps(log_entry))
+        print(json.dumps(log_entry), flush=True)
         
         # Wait for a random interval to simulate real traffic
         time.sleep(random.uniform(0.2, 1.5))

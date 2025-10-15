@@ -59,7 +59,9 @@ services:
         tag: "kibana"
 
   log-generator:
-    image: taksan/fake-log-generator:latest
+    build:
+      context: ./log-generator
+      dockerfile: Dockerfile
     container_name: log_generator
     restart: on-failure
     # --- UPDATE depends_on ---
