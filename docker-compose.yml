@@ -1,0 +1,84 @@
+# docker-compose.yml
+
+version: '3.8'
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    networks:
+      - elk_net
+    # --- ADD THIS HEALTHCHECK ---
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -vq '\"status\":\"red\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.12.2
+    container_name: logstash
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+    ports:
+      - "5000:5000/tcp"
+      - "9600:9600"
+      - "12201:12201/udp"
+    # --- UPDATE depends_on ---
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - elk_net
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.12.2
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    # --- UPDATE depends_on ---
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - elk_net
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://localhost:12201"
+        tag: "kibana"
+
+  log-generator:
+    image: taksan/fake-log-generator:latest
+    container_name: log_generator
+    restart: on-failure
+    # --- UPDATE depends_on ---
+    # Log-generator should wait for Logstash to be ready
+    depends_on:
+      logstash:
+        condition: service_started # No healthcheck needed here, just start order
+    networks:
+      - elk_net
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://localhost:12201"
+        tag: "log-generator"
+
+networks:
+  elk_net:
+    driver: bridge
+
+volumes:
+  es_data:
+    driver: local
