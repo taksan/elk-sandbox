@@ -1,3 +1,4 @@
 Faker
 fastapi
 uvicorn[standard]
+requests

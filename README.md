@@ -21,17 +21,17 @@ This project provides a ready-to-use logging infrastructure that:
 │  Port 8000 (API)        │                │
 └─────────────────────────┘                │
          ▲                                 ▼
-         │                          ┌──────────┐         ┌────────────────┐
-    Management API                  │ Logstash │ ──────► │ Elasticsearch  │
-  (update_interval,                 │(Port 5000│         │  (Port 9200)   │
-   simulate_ddos)                   │Port 12201)│        └────────────────┘
-                                    └──────────┘                 │
-                                         │                       │
-                                         ▼                       ▼
-                                  ┌─────────────────────────────────┐
-                                  │          Kibana                 │
-                                  │        (Port 5601)              │
-                                  └─────────────────────────────────┘
+         │                          ┌──────────────┐         ┌────────────────┐
+    Management API                  │  Logstash    │ ──────► │ Elasticsearch  │
+  (update_interval,                 │ Port 5044    │         │  (Port 9200)   │
+   simulate_ddos)                   │ Port 12201   │         └────────────────┘
+         │                          └──────────────┘                 │
+         │                                 ▲                         │
+         │                                 │                         ▼
+┌─────────────────────────┐                │                  ┌──────────┐
+│   User Database         │ ──(logs)──► Filebeat              │  Kibana  │
+│  Port 8500 (API)        │                                   │Port 5601 │
+└─────────────────────────┘                                   └──────────┘
 ```
 
 ## Prerequisites
@@ -50,9 +50,11 @@ docker-compose up -d
 
 This will start all services:
 - **Elasticsearch** on port 9200
-- **Logstash** on ports 5000 (TCP) and 12201 (UDP/GELF)
+- **Logstash** on ports 5044 (Beats) and 12201 (UDP/GELF)
 - **Kibana** on port 5601
-- **Log Generator** (automatically starts generating logs)
+- **Log Generator** on port 8000 (API)
+- **User Database** on port 8500 (API)
+- **Filebeat** (collects user database logs)
 
 ### 2. Access Kibana
 
@@ -63,14 +65,20 @@ http://localhost:5601
 
 Wait a few moments for Kibana to initialize (usually 30-60 seconds).
 
-### 3. Create Index Pattern
+### 3. Create Data Views
 
-1. In Kibana, go to **Management** → **Stack Management** → **Index Patterns**
-2. Click **Create index pattern**
+**For Web Application Logs:**
+1. In Kibana, go to **Management** → **Stack Management** → **Data Views**
+2. Click **Create data view**
 3. Enter the pattern: `webapp-logs-*`
-4. Click **Next step**
-5. Select `@timestamp` as the time field
-6. Click **Create index pattern**
+4. Select `@timestamp` as the time field
+5. Click **Save data view**
+
+**For User Database Logs:**
+1. Click **Create data view** again
+2. Enter the pattern: `user-database-logs-*`
+3. Select `@timestamp` as the time field
+4. Click **Save data view**
 
 ### 4. View Logs
 
@@ -101,7 +109,7 @@ curl http://localhost:8000/
 - **Health Check**: `http://localhost:9200/_cluster/health`
 
 ### Logstash
-- **TCP Port**: 5000 (JSON lines input)
+- **Beats Port**: 5044 (Filebeat input)
 - **UDP Port**: 12201 (GELF input)
 - **Purpose**: Processes, enriches, and routes logs
 - **Features**:
@@ -109,6 +117,7 @@ curl http://localhost:8000/
   - User-Agent parsing
   - Timestamp normalization
   - JSON parsing for structured logs
+  - Routes logs to different indices based on source
 
 ### Kibana
 - **Port**: 5601
@@ -119,6 +128,7 @@ curl http://localhost:8000/
 - **Port**: 8000 (Management API)
 - **Purpose**: Generates realistic web application logs
 - **Log Format**: JSON with structured fields
+- **User Management**: Fetches users from User Database service
 - **Geographic Distribution**: 
   - Europe: 20%
   - Asia: 20%
@@ -128,6 +138,23 @@ curl http://localhost:8000/
   - North America: 10%
 - **Log Rate**: ~1-5 logs per second (configurable via API)
 - **API Documentation**: http://localhost:8000/docs
+
+### User Database
+- **Port**: 8500 (API)
+- **Purpose**: Manages up to 100 users for log generation
+- **Storage**: Persistent JSON file in Docker volume
+- **Logging**: Logs all requests to file for Filebeat collection
+- **Endpoints**:
+  - `GET /user/random` - Get or create a user
+  - `GET /users` - List all users
+  - `GET /health` - Health check
+  - `POST /users/reset` - Reset all users
+
+### Filebeat
+- **Purpose**: Collects logs from User Database service
+- **Input**: Reads `/data/user_database.log`
+- **Output**: Sends to Logstash on port 5044
+- **Index**: Logs are stored in `user-database-logs-*`
 
 ## Log Structure
 
@@ -161,6 +188,25 @@ Each generated log entry contains:
 After Logstash processing, additional fields are added:
 - `client.geo.*` - Geographic information (country, city, coordinates)
 - `user_agent.parsed.*` - Parsed browser and OS information
+
+### User Database Log Structure
+
+User database logs have a simpler structure:
+
+```json
+{
+  "timestamp": "2025-10-15T19:00:00.000Z",
+  "service": "user-database",
+  "action": "created_new",
+  "user_id": 42,
+  "user_name": "John Doe"
+}
+```
+
+**Actions:**
+- `created_new` - A new user was created
+- `returned_existing` - An existing user was returned
+- `returned_existing_max_reached` - Max users (100) reached, returned existing user
 
 ## Log Generator API
 
@@ -355,7 +401,7 @@ docker-compose ps
 
 ### Port Already in Use
 
-If ports 5601, 9200, or 12201 are already in use, modify `docker-compose.yml`:
+If ports 5601, 9200, 5044, 8000, 8500, or 12201 are already in use, modify `docker-compose.yml`:
 ```yaml
 ports:
   - "5602:5601"  # Change host port
@@ -372,10 +418,14 @@ docker-compose logs <service-name>
 
 - `docker-compose.yml` - Service definitions and configuration
 - `logstash/pipeline/logstash.conf` - Logstash pipeline configuration
+- `filebeat/filebeat.yml` - Filebeat configuration
 - `log-generator/log_generator.py` - Core log generation logic
 - `log-generator/api.py` - FastAPI application for management
 - `log-generator/Dockerfile` - Log generator container image
 - `log-generator/requirements.txt` - Python dependencies
+- `user-database/app.py` - User database Flask application
+- `user-database/Dockerfile` - User database container image
+- `user-database/requirements.txt` - User database Python dependencies
 - `remove-volumes.sh` - Script to clean up volumes
 - `update-interval.sh` - Script to update log generation interval
 - `simulate-ddos.sh` - Script to simulate DDoS attacks
@@ -475,7 +525,8 @@ docker-compose up --build -d log-generator
 ```
 
 ### API Endpoints
-- **API Docs**: http://localhost:8000/docs
+- **Log Generator API**: http://localhost:8000/docs
+- **User Database API**: http://localhost:8500/health
 - **Kibana**: http://localhost:5601
 - **Elasticsearch**: http://localhost:9200
 
@@ -489,6 +540,12 @@ curl http://localhost:9200/_cat/indices?v
 
 # Check log generator status
 curl http://localhost:8000/status
+
+# Check user database
+curl http://localhost:8500/users
+
+# Count user database logs
+curl http://localhost:9200/user-database-logs-*/_count
 ```
 
 ## License

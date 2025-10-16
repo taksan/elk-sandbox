@@ -29,7 +29,7 @@ services:
     volumes:
       - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
     ports:
-      - "5000:5000/tcp"
+      - "5044:5044/tcp"
       - "9600:9600"
       - "12201:12201/udp"
     # --- UPDATE depends_on ---
@@ -66,6 +66,8 @@ services:
     depends_on:
       logstash:
         condition: service_started # No healthcheck needed here, just start order
+      user-database:
+        condition: service_started
     networks:
       - elk_net
     logging:
@@ -74,10 +76,49 @@ services:
         gelf-address: "udp://localhost:12201"
         tag: "log-generator"
 
+  user-database:
+    build:
+      context: ./user-database
+      dockerfile: Dockerfile
+    container_name: user_database
+    restart: on-failure
+    ports:
+      - "8500:8500"
+    volumes:
+      - user_data:/data
+    networks:
+      - elk_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8500/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.12.2
+    container_name: filebeat
+    user: root
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - user_data:/data:ro
+      - filebeat_data:/usr/share/filebeat/data
+    depends_on:
+      logstash:
+        condition: service_started
+      user-database:
+        condition: service_started
+    networks:
+      - elk_net
+    command: filebeat -e -strict.perms=false
+
 networks:
   elk_net:
     driver: bridge
 
 volumes:
   es_data:
+    driver: local
+  user_data:
+    driver: local
+  filebeat_data:
     driver: local

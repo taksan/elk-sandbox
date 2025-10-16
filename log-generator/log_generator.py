@@ -6,6 +6,7 @@ import json
 import random
 from datetime import datetime
 from faker import Faker
+import requests
 
 fake = Faker()
 
@@ -18,6 +19,7 @@ class LogGeneratorConfig:
         self.ddos_active = False
         self.ddos_end_time = 0
         self.ddos_region = None
+        self.user_db_url = "http://user-database:8500"
 
 
 def get_region_ip_ranges():
@@ -195,7 +197,21 @@ def generate_ip_from_region(region_name):
     return '.'.join(map(str, ip_parts))
 
 
-def generate_log_entry(override_ip=None):
+def fetch_user_from_db(user_db_url):
+    """Fetch a random user from the user database API."""
+    try:
+        response = requests.get(f"{user_db_url}/user/random", timeout=5)
+        if response.status_code in [200, 201]:
+            user_data = response.json()
+            return user_data['id'], user_data['name']
+    except Exception as e:
+        print(f"Error fetching user from database: {e}", flush=True)
+    
+    # Fallback to fake user if API fails
+    return None, fake.user_name()
+
+
+def generate_log_entry(override_ip=None, user_db_url=None):
     """Generates a single, structured log entry."""
     
     # Simulate different HTTP methods
@@ -211,9 +227,14 @@ def generate_log_entry(override_ip=None):
     # Generate a fake URL path
     uri = fake.uri_path()
     
+    # Fetch user from database
+    user_id, user_name = fetch_user_from_db(user_db_url) if user_db_url else (None, fake.user_name())
+    
     # Add product or user context to some URLs
     if random.random() < 0.3:
         uri = f"/products/{fake.word()}/{random.randint(1000, 9999)}"
+    elif random.random() < 0.2 and user_id:
+        uri = f"/users/{user_id}/profile"
     elif random.random() < 0.2:
         uri = f"/users/{fake.user_name()}/profile"
     
@@ -224,7 +245,8 @@ def generate_log_entry(override_ip=None):
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "level": "INFO" if status_code < 400 else ("ERROR" if status_code >= 500 else "WARN"),
         "client_ip": client_ip,
-        "user_id": f"user_{random.randint(1, 100)}",
+        "user_id": user_id,
+        "user_name": user_name,
         "http": {
             "request": {
                 "method": method,
@@ -249,13 +271,29 @@ def generate_log_entry(override_ip=None):
 def run_log_generator(config: LogGeneratorConfig):
     """Main log generation loop."""
     print("Log generator started", flush=True)
+    
+    # Wait for user database to be ready
+    print("Waiting for user database to be ready...", flush=True)
+    max_retries = 30
+    for i in range(max_retries):
+        try:
+            response = requests.get(f"{config.user_db_url}/health", timeout=2)
+            if response.status_code == 200:
+                print("User database is ready!", flush=True)
+                break
+        except Exception:
+            pass
+        time.sleep(2)
+    else:
+        print("Warning: User database not responding, will use fallback users", flush=True)
+    
     while True:
         # Check if DDoS simulation is active
         if config.ddos_active and time.time() < config.ddos_end_time:
             # Generate DDoS traffic - many requests from same region
             ddos_ip = generate_ip_from_region(config.ddos_region)
             for _ in range(random.randint(50, 100)):
-                log_entry = generate_log_entry(override_ip=ddos_ip)
+                log_entry = generate_log_entry(override_ip=ddos_ip, user_db_url=config.user_db_url)
                 print(json.dumps(log_entry), flush=True)
             time.sleep(0.1)  # Short burst interval during DDoS
         elif config.ddos_active and time.time() >= config.ddos_end_time:
@@ -265,6 +303,6 @@ def run_log_generator(config: LogGeneratorConfig):
             print(f"DDoS simulation ended", flush=True)
         else:
             # Normal traffic generation
-            log_entry = generate_log_entry()
+            log_entry = generate_log_entry(user_db_url=config.user_db_url)
             print(json.dumps(log_entry), flush=True)
             time.sleep(random.uniform(config.min_interval, config.max_interval))
