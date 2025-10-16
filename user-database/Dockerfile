@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
-# Install tini
-RUN apt-get update && apt-get install -y --no-install-recommends tini && rm -rf /var/lib/apt/lists/*
+# Install tini and curl for health checks
+RUN apt-get update && apt-get install -y --no-install-recommends tini curl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

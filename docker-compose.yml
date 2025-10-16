@@ -61,6 +61,8 @@ services:
     restart: on-failure
     ports:
       - "8000:8000"
+    volumes:
+      - ./user_flows.yml:/app/user_flows.yml:ro
     # --- UPDATE depends_on ---
     # Log-generator should wait for Logstash to be ready
     depends_on:

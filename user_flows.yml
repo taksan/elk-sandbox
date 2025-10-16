@@ -1,0 +1,178 @@
+# User Flow Definitions
+# Each flow represents a typical user journey through the application
+# Placeholders starting with : will be replaced with random values
+
+flows:
+  buy_flow:
+    name: "Purchase Flow"
+    weight: 3  # Higher weight = more likely to be selected
+    steps:
+      - /
+      - /search
+      - /products
+      - /products/:product_id
+      - /products/:product_id/reviews
+      - /products/:product_id/add_to_cart
+      - /cart
+      - /login
+      - /checkout
+      - /checkout/payment
+      - /checkout/confirm
+      - /order/:order_id
+
+  browse_and_buy:
+    name: "Browse and Purchase"
+    weight: 2
+    steps:
+      - /
+      - /categories/:category
+      - /products
+      - /products/:product_id
+      - /products/:product_id/add_to_cart
+      - /cart
+      - /login
+      - /checkout
+      - /order/:order_id
+
+  quick_purchase:
+    name: "Quick Purchase (Logged In User)"
+    weight: 2
+    steps:
+      - /
+      - /search
+      - /products/:product_id
+      - /products/:product_id/add_to_cart
+      - /checkout
+      - /order/:order_id
+
+  check_profile:
+    name: "Check Profile"
+    weight: 4
+    steps:
+      - /
+      - /login
+      - /profile/:user_id
+      - /profile/:user_id/orders
+      - /profile/:user_id/settings
+
+  browse_only:
+    name: "Browse Without Purchase"
+    weight: 5
+    steps:
+      - /
+      - /categories/:category
+      - /products
+      - /products/:product_id
+      - /products/:product_id/reviews
+      - /categories/:category
+      - /products/:product_id
+
+  search_flow:
+    name: "Search and Browse"
+    weight: 4
+    steps:
+      - /
+      - /search
+      - /search/results
+      - /products/:product_id
+      - /products/:product_id/reviews
+
+  abandoned_cart:
+    name: "Abandoned Cart"
+    weight: 2
+    steps:
+      - /
+      - /products/:product_id
+      - /products/:product_id/add_to_cart
+      - /cart
+      - /
+
+  check_order_status:
+    name: "Check Order Status"
+    weight: 3
+    steps:
+      - /
+      - /login
+      - /profile/:user_id/orders
+      - /order/:order_id
+      - /order/:order_id/tracking
+
+  product_comparison:
+    name: "Compare Products"
+    weight: 2
+    steps:
+      - /
+      - /search
+      - /products/:product_id
+      - /products/:product_id/compare
+      - /products/:product_id
+      - /products/:product_id/reviews
+
+  wishlist_flow:
+    name: "Wishlist Management"
+    weight: 2
+    steps:
+      - /
+      - /login
+      - /products/:product_id
+      - /products/:product_id/add_to_wishlist
+      - /profile/:user_id/wishlist
+      - /products/:product_id
+
+  support_flow:
+    name: "Customer Support"
+    weight: 1
+    steps:
+      - /
+      - /login
+      - /support
+      - /support/tickets
+      - /support/tickets/:ticket_id
+      - /support/chat
+
+# Placeholder value generators
+# These define how to generate values for placeholders
+placeholders:
+  product_id:
+    type: integer
+    min: 1000
+    max: 9999
+  
+  user_id:
+    type: integer
+    min: 1
+    max: 100
+  
+  order_id:
+    type: integer
+    min: 10000
+    max: 99999
+  
+  category:
+    type: choice
+    values:
+      - electronics
+      - clothing
+      - books
+      - home
+      - sports
+      - toys
+      - beauty
+      - automotive
+  
+  ticket_id:
+    type: integer
+    min: 1000
+    max: 5000
+
+# Configuration
+config:
+  # Percentage of requests that should be random (not part of a flow)
+  random_request_percentage: 30
+  
+  # Min/max delay between steps in a flow (seconds)
+  flow_step_delay_min: 0.5
+  flow_step_delay_max: 3.0
+  
+  # Probability of abandoning a flow before completion
+  flow_abandon_probability: 0.15

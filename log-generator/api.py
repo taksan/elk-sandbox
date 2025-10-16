@@ -38,8 +38,9 @@ async def root():
     """API status and information."""
     return {
         "service": "Log Generator API",
-        "status": "running",
+        "status": "running" if config.traffic_enabled else "paused",
         "config": {
+            "traffic_enabled": config.traffic_enabled,
             "min_interval": config.min_interval,
             "max_interval": config.max_interval,
             "ddos_active": config.ddos_active,
@@ -94,12 +95,60 @@ async def simulate_ddos(ddos: DDoSSimulation):
 async def get_status():
     """Get current generator status."""
     return {
+        "traffic_enabled": config.traffic_enabled,
         "min_interval": config.min_interval,
         "max_interval": config.max_interval,
         "ddos_active": config.ddos_active,
         "ddos_region": config.ddos_region if config.ddos_active else None,
-        "ddos_remaining": max(0, config.ddos_end_time - time.time()) if config.ddos_active else 0
+        "ddos_remaining": max(0, config.ddos_end_time - time.time()) if config.ddos_active else 0,
+        "active_flows": config.flow_manager.get_active_flow_count()
     }
+
+
+@app.post("/traffic/start")
+async def start_traffic():
+    """Start traffic generation."""
+    if config.traffic_enabled:
+        return {
+            "status": "info",
+            "message": "Traffic generation is already running"
+        }
+    
+    config.traffic_enabled = True
+    return {
+        "status": "success",
+        "message": "Traffic generation started",
+        "traffic_enabled": config.traffic_enabled
+    }
+
+
+@app.post("/traffic/stop")
+async def stop_traffic():
+    """Stop traffic generation."""
+    if not config.traffic_enabled:
+        return {
+            "status": "info",
+            "message": "Traffic generation is already stopped"
+        }
+    
+    config.traffic_enabled = False
+    return {
+        "status": "success",
+        "message": "Traffic generation stopped",
+        "traffic_enabled": config.traffic_enabled
+    }
+
+
+@app.post("/traffic/pause")
+async def pause_traffic():
+    """Pause traffic generation (alias for stop)."""
+    return await stop_traffic()
+
+
+@app.post("/traffic/resume")
+async def resume_traffic():
+    """Resume traffic generation (alias for start)."""
+    return await start_traffic()
 
 
 if __name__ == "__main__":

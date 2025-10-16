@@ -10,6 +10,7 @@ This project provides a ready-to-use logging infrastructure that:
 - Stores logs in Elasticsearch with daily indices
 - Visualizes data through Kibana dashboards
 - Generates realistic web traffic logs from multiple geographic regions
+- **Simulates realistic user flows and journeys** (browse, purchase, profile checks, etc.)
 - **Provides a REST API to control log generation in real-time**
 - **Simulates DDoS attacks for testing and demonstration**
 
@@ -93,6 +94,11 @@ Test the management API:
 # Check API status
 curl http://localhost:8000/
 
+# Control traffic generation
+./traffic-stop.sh       # Stop traffic
+./traffic-start.sh      # Start traffic
+./traffic-status.sh     # Check status
+
 # Speed up log generation
 ./update-interval.sh 0.1 0.3
 
@@ -129,6 +135,13 @@ curl http://localhost:8000/
 - **Purpose**: Generates realistic web application logs
 - **Log Format**: JSON with structured fields
 - **User Management**: Fetches users from User Database service
+- **User Flows**: Simulates realistic user journeys (see `USER_FLOWS.md`)
+  - Purchase flows
+  - Browse-only sessions
+  - Profile management
+  - Support interactions
+  - Abandoned carts
+  - 30% random traffic, 70% flow-based
 - **Geographic Distribution**: 
   - Europe: 20%
   - Asia: 20%
@@ -222,10 +235,42 @@ curl http://localhost:8000/
 ```
 
 #### GET /status
-Get detailed generator status including DDoS simulation state.
+Get detailed generator status including DDoS simulation state and active flows.
 
 ```bash
 curl http://localhost:8000/status
+```
+
+#### POST /traffic/start
+Start traffic generation.
+
+```bash
+curl -X POST http://localhost:8000/traffic/start
+# Or use the script
+./traffic-start.sh
+```
+
+#### POST /traffic/stop
+Stop traffic generation.
+
+```bash
+curl -X POST http://localhost:8000/traffic/stop
+# Or use the script
+./traffic-stop.sh
+```
+
+#### POST /traffic/pause
+Pause traffic generation (alias for stop).
+
+```bash
+curl -X POST http://localhost:8000/traffic/pause
+```
+
+#### POST /traffic/resume
+Resume traffic generation (alias for start).
+
+```bash
+curl -X POST http://localhost:8000/traffic/resume
 ```
 
 #### POST /update_interval
@@ -417,9 +462,11 @@ docker-compose logs <service-name>
 ## Configuration Files
 
 - `docker-compose.yml` - Service definitions and configuration
+- `user_flows.yml` - **User flow definitions** (customize user journeys)
 - `logstash/pipeline/logstash.conf` - Logstash pipeline configuration
 - `filebeat/filebeat.yml` - Filebeat configuration
 - `log-generator/log_generator.py` - Core log generation logic
+- `log-generator/flow_manager.py` - User flow state machine manager
 - `log-generator/api.py` - FastAPI application for management
 - `log-generator/Dockerfile` - Log generator container image
 - `log-generator/requirements.txt` - Python dependencies
@@ -427,8 +474,21 @@ docker-compose logs <service-name>
 - `user-database/Dockerfile` - User database container image
 - `user-database/requirements.txt` - User database Python dependencies
 - `remove-volumes.sh` - Script to clean up volumes
+- `traffic-start.sh` - Script to start traffic generation
+- `traffic-stop.sh` - Script to stop traffic generation
+- `traffic-status.sh` - Script to check traffic status
 - `update-interval.sh` - Script to update log generation interval
 - `simulate-ddos.sh` - Script to simulate DDoS attacks
+
+## Documentation
+
+- 📖 `README.md` - This file (main documentation)
+- 🚀 `QUICK_REFERENCE.md` - **Quick reference card** (start here!)
+- 🔄 `USER_FLOWS.md` - User flow system documentation
+- 🎮 `TRAFFIC_CONTROL.md` - Traffic control API guide
+- 📊 `IMPLEMENTATION_SUMMARY.md` - Complete implementation overview
+- 🗂️ `FLOW_SYSTEM_SUMMARY.md` - Flow system technical details
+- 👥 `SETUP_USER_DATABASE.md` - User database setup guide
 
 ## Customization
 
@@ -517,6 +577,11 @@ docker-compose up --build -d log-generator
 
 ### Management Scripts
 ```bash
+# Control traffic generation
+./traffic-start.sh      # Start/resume traffic generation
+./traffic-stop.sh       # Stop/pause traffic generation
+./traffic-status.sh     # Check current status
+
 # Update log generation speed
 ./update-interval.sh <min> <max>
 

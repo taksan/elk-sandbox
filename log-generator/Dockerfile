@@ -11,6 +11,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application files
 COPY log_generator.py .
+COPY flow_manager.py .
+COPY error_manager.py .
 COPY api.py .
 
 RUN apk add --no-cache netcat-openbsd

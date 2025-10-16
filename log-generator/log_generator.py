@@ -1,5 +1,4 @@
-"""
-Log generation module - handles all log generation logic
+"""Log generation module - handles all log generation logic
 """
 import time
 import json
@@ -7,6 +6,8 @@ import random
 from datetime import datetime
 from faker import Faker
 import requests
+from flow_manager import FlowManager
+from error_manager import ErrorManager
 
 fake = Faker()
 
@@ -14,12 +15,15 @@ fake = Faker()
 class LogGeneratorConfig:
     """Configuration for log generator."""
     def __init__(self):
+        self.traffic_enabled = True  # Traffic generation on/off
         self.min_interval = 0.2
         self.max_interval = 1.5
         self.ddos_active = False
         self.ddos_end_time = 0
         self.ddos_region = None
         self.user_db_url = "http://user-database:8500"
+        self.flow_manager = FlowManager()
+        self.error_manager = ErrorManager()
 
 
 def get_region_ip_ranges():
@@ -211,35 +215,73 @@ def fetch_user_from_db(user_db_url):
     return None, fake.user_name()
 
 
-def generate_log_entry(override_ip=None, user_db_url=None):
-    """Generates a single, structured log entry."""
+def generate_log_entry(override_ip=None, user_db_url=None, uri=None, flow_context=None, 
+                       is_ddos=False, error_manager=None):
+    """Generates a single, structured log entry.
     
-    # Simulate different HTTP methods
-    method = random.choice(["GET", "POST", "PUT", "DELETE", "PATCH"])
+    Args:
+        override_ip: Override IP address (for DDoS simulation)
+        user_db_url: URL of user database service
+        uri: Specific URI to use (from flow)
+        flow_context: Context from flow (IP, user agent, user info)
+        is_ddos: Whether this is a DDoS request
+        error_manager: ErrorManager instance for generating realistic errors
+    """
     
-    # Simulate common status codes, with a higher probability for 2xx and 4xx
-    status_code = random.choices(
-        [200, 201, 204, 301, 400, 401, 403, 404, 500, 503], 
-        weights=[15, 5, 2, 3, 5, 3, 2, 10, 4, 1], 
-        k=1
-    )[0]
+    # Use flow context if provided, otherwise generate new
+    if flow_context:
+        client_ip = flow_context.get('client_ip')
+        user_agent = flow_context.get('user_agent')
+        user_id = flow_context.get('user_id')
+        user_name = flow_context.get('user_name')
+    else:
+        client_ip = override_ip if override_ip else generate_distributed_ip()
+        user_agent = fake.user_agent()
+        user_id, user_name = fetch_user_from_db(user_db_url) if user_db_url else (None, fake.user_name())
     
-    # Generate a fake URL path
-    uri = fake.uri_path()
+    # Determine HTTP method based on URI
+    if uri:
+        # Flow-based request
+        if '/login' in uri or '/checkout' in uri or '/add_to_cart' in uri or '/add_to_wishlist' in uri:
+            method = "POST"
+        elif '/delete' in uri or '/remove' in uri:
+            method = "DELETE"
+        elif '/update' in uri or '/edit' in uri:
+            method = "PUT"
+        else:
+            method = "GET"
+    else:
+        # Random request
+        method = random.choice(["GET", "POST", "PUT", "DELETE", "PATCH"])
+        uri = fake.uri_path()
+        
+        # Add product or user context to some URLs
+        if random.random() < 0.3:
+            uri = f"/products/{fake.word()}/{random.randint(1000, 9999)}"
+        elif random.random() < 0.2 and user_id:
+            uri = f"/users/{user_id}/profile"
+        elif random.random() < 0.2:
+            uri = f"/users/{fake.user_name()}/profile"
     
-    # Fetch user from database
-    user_id, user_name = fetch_user_from_db(user_db_url) if user_db_url else (None, fake.user_name())
-    
-    # Add product or user context to some URLs
-    if random.random() < 0.3:
-        uri = f"/products/{fake.word()}/{random.randint(1000, 9999)}"
-    elif random.random() < 0.2 and user_id:
-        uri = f"/users/{user_id}/profile"
-    elif random.random() < 0.2:
-        uri = f"/users/{fake.user_name()}/profile"
-    
-    # Use override IP if in DDoS mode, otherwise generate distributed IP
-    client_ip = override_ip if override_ip else generate_distributed_ip()
+    # Generate realistic status code and error message using ErrorManager
+    is_authenticated = user_id is not None
+    if error_manager:
+        status_code, error_message = error_manager.get_status_code(
+            uri=uri,
+            is_authenticated=is_authenticated,
+            is_ddos=is_ddos,
+            method=method
+        )
+        response_bytes = error_manager.get_response_bytes(status_code)
+    else:
+        # Fallback to simple random selection
+        status_code = random.choices(
+            [200, 201, 204, 301, 400, 401, 403, 404, 500, 503], 
+            weights=[15, 5, 2, 3, 5, 3, 2, 10, 4, 1], 
+            k=1
+        )[0]
+        error_message = f"HTTP {status_code}"
+        response_bytes = random.randint(50, 50000)
         
     log_data = {
         "timestamp": datetime.utcnow().isoformat() + "Z",
@@ -254,16 +296,24 @@ def generate_log_entry(override_ip=None, user_db_url=None):
             },
             "response": {
                 "status_code": status_code,
-                "bytes": random.randint(50, 50000)
+                "bytes": response_bytes
             },
             "url": uri,
             "version": "1.1"
         },
         "user_agent": {
-            "original": fake.user_agent()
+            "original": user_agent
         },
         "message": f'{method} {uri} - {status_code}'
     }
+    
+    # Add error message for non-success responses
+    if status_code >= 400 and error_manager:
+        log_data['error'] = error_message
+    
+    # Add flow name if part of a flow
+    if flow_context and 'flow_name' in flow_context:
+        log_data['flow_name'] = flow_context['flow_name']
     
     return log_data
 
@@ -287,13 +337,30 @@ def run_log_generator(config: LogGeneratorConfig):
     else:
         print("Warning: User database not responding, will use fallback users", flush=True)
     
+    last_cleanup = time.time()
+    
     while True:
+        # Check if traffic generation is enabled
+        if not config.traffic_enabled:
+            time.sleep(1)  # Sleep while paused
+            continue
+        
+        # Periodic cleanup of old flows
+        if time.time() - last_cleanup > 60:
+            config.flow_manager.cleanup_old_flows()
+            last_cleanup = time.time()
+        
         # Check if DDoS simulation is active
         if config.ddos_active and time.time() < config.ddos_end_time:
             # Generate DDoS traffic - many requests from same region
             ddos_ip = generate_ip_from_region(config.ddos_region)
             for _ in range(random.randint(50, 100)):
-                log_entry = generate_log_entry(override_ip=ddos_ip, user_db_url=config.user_db_url)
+                log_entry = generate_log_entry(
+                    override_ip=ddos_ip, 
+                    user_db_url=config.user_db_url,
+                    is_ddos=True,
+                    error_manager=config.error_manager
+                )
                 print(json.dumps(log_entry), flush=True)
             time.sleep(0.1)  # Short burst interval during DDoS
         elif config.ddos_active and time.time() >= config.ddos_end_time:
@@ -302,7 +369,73 @@ def run_log_generator(config: LogGeneratorConfig):
             config.ddos_region = None
             print(f"DDoS simulation ended", flush=True)
         else:
-            # Normal traffic generation
-            log_entry = generate_log_entry(user_db_url=config.user_db_url)
-            print(json.dumps(log_entry), flush=True)
-            time.sleep(random.uniform(config.min_interval, config.max_interval))
+            # Normal traffic generation with flows
+            
+            # Decide: flow request or random request
+            if config.flow_manager.should_generate_random_request():
+                # Generate random request (anonymous user)
+                log_entry = generate_log_entry(
+                    user_db_url=config.user_db_url,
+                    error_manager=config.error_manager
+                )
+                print(json.dumps(log_entry), flush=True)
+                time.sleep(random.uniform(config.min_interval, config.max_interval))
+            else:
+                # Try to get next step from existing flow
+                flow_request = config.flow_manager.get_next_flow_request()
+                
+                if flow_request:
+                    # Continue existing flow
+                    uri, flow_context = flow_request
+                    log_entry = generate_log_entry(
+                        user_db_url=config.user_db_url,
+                        uri=uri,
+                        flow_context=flow_context,
+                        error_manager=config.error_manager
+                    )
+                    print(json.dumps(log_entry), flush=True)
+                    time.sleep(config.flow_manager.get_step_delay())
+                else:
+                    # Start new flow
+                    # Get user from database
+                    user_id, user_name = fetch_user_from_db(config.user_db_url)
+                    client_ip = generate_distributed_ip()
+                    user_agent = fake.user_agent()
+                    
+                    # Start the flow
+                    flow = config.flow_manager.start_new_flow(
+                        client_ip=client_ip,
+                        user_agent=user_agent,
+                        user_id=user_id,
+                        user_name=user_name
+                    )
+                    
+                    if flow:
+                        # Generate first step of the flow
+                        flow_request = config.flow_manager.get_next_flow_request()
+                        if flow_request:
+                            uri, flow_context = flow_request
+                            log_entry = generate_log_entry(
+                                user_db_url=config.user_db_url,
+                                uri=uri,
+                                flow_context=flow_context,
+                                error_manager=config.error_manager
+                            )
+                            print(json.dumps(log_entry), flush=True)
+                            time.sleep(config.flow_manager.get_step_delay())
+                        else:
+                            # Flow was abandoned immediately, generate random
+                            log_entry = generate_log_entry(
+                                user_db_url=config.user_db_url,
+                                error_manager=config.error_manager
+                            )
+                            print(json.dumps(log_entry), flush=True)
+                            time.sleep(random.uniform(config.min_interval, config.max_interval))
+                    else:
+                        # Fallback to random if no flows configured
+                        log_entry = generate_log_entry(
+                            user_db_url=config.user_db_url,
+                            error_manager=config.error_manager
+                        )
+                        print(json.dumps(log_entry), flush=True)
+                        time.sleep(random.uniform(config.min_interval, config.max_interval))
