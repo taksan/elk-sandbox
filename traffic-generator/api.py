@@ -1,5 +1,5 @@
 """
-FastAPI application for log generator management
+FastAPI application for traffic generator management
 """
 import time
 import random
@@ -10,10 +10,10 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import uvicorn
 
-from log_generator import LogGeneratorConfig, run_log_generator, get_region_ip_ranges
+from traffic_generator import LogGeneratorConfig, run_log_generator, get_region_ip_ranges
 
 # Initialize FastAPI app
-app = FastAPI(title="Log Generator API", version="1.0.0")
+app = FastAPI(title="Traffic Generator API", version="1.0.0")
 
 # Global configuration instance
 config = LogGeneratorConfig()
@@ -21,7 +21,7 @@ config = LogGeneratorConfig()
 
 # API Models
 class IntervalUpdate(BaseModel):
-    """Model for updating log generation interval."""
+    """Model for updating traffic generation interval."""
     min_interval: float
     max_interval: float
 
@@ -37,7 +37,7 @@ class DDoSSimulation(BaseModel):
 async def root():
     """API status and information."""
     return {
-        "service": "Log Generator API",
+        "service": "Traffic Generator API",
         "status": "running" if config.traffic_enabled else "paused",
         "config": {
             "traffic_enabled": config.traffic_enabled,

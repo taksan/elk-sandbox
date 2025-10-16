@@ -13,7 +13,7 @@ fake = Faker()
 
 
 class LogGeneratorConfig:
-    """Configuration for log generator."""
+    """Configuration for traffic generator."""
     def __init__(self):
         self.traffic_enabled = True  # Traffic generation on/off
         self.min_interval = 0.2
@@ -216,7 +216,7 @@ def fetch_user_from_db(user_db_url):
 
 
 def generate_log_entry(override_ip=None, user_db_url=None, uri=None, flow_context=None, 
-                       is_ddos=False, error_manager=None):
+                       is_ddos=False, error_manager=None, flow_manager=None):
     """Generates a single, structured log entry.
     
     Args:
@@ -226,6 +226,7 @@ def generate_log_entry(override_ip=None, user_db_url=None, uri=None, flow_contex
         flow_context: Context from flow (IP, user agent, user info)
         is_ddos: Whether this is a DDoS request
         error_manager: ErrorManager instance for generating realistic errors
+        flow_manager: FlowManager instance for method mapping
     """
     
     # Use flow context if provided, otherwise generate new
@@ -241,14 +242,11 @@ def generate_log_entry(override_ip=None, user_db_url=None, uri=None, flow_contex
     
     # Determine HTTP method based on URI
     if uri:
-        # Flow-based request
-        if '/login' in uri or '/checkout' in uri or '/add_to_cart' in uri or '/add_to_wishlist' in uri:
-            method = "POST"
-        elif '/delete' in uri or '/remove' in uri:
-            method = "DELETE"
-        elif '/update' in uri or '/edit' in uri:
-            method = "PUT"
+        # Use flow_manager's method mapping if available
+        if flow_manager:
+            method = flow_manager.get_http_method(uri)
         else:
+            # Fallback to GET if no flow_manager
             method = "GET"
     else:
         # Random request
@@ -319,8 +317,8 @@ def generate_log_entry(override_ip=None, user_db_url=None, uri=None, flow_contex
 
 
 def run_log_generator(config: LogGeneratorConfig):
-    """Main log generation loop."""
-    print("Log generator started", flush=True)
+    """Main traffic generation loop."""
+    print("Traffic generator started", flush=True)
     
     # Wait for user database to be ready
     print("Waiting for user database to be ready...", flush=True)
@@ -359,7 +357,8 @@ def run_log_generator(config: LogGeneratorConfig):
                     override_ip=ddos_ip, 
                     user_db_url=config.user_db_url,
                     is_ddos=True,
-                    error_manager=config.error_manager
+                    error_manager=config.error_manager,
+                    flow_manager=config.flow_manager
                 )
                 print(json.dumps(log_entry), flush=True)
             time.sleep(0.1)  # Short burst interval during DDoS
@@ -376,7 +375,8 @@ def run_log_generator(config: LogGeneratorConfig):
                 # Generate random request (anonymous user)
                 log_entry = generate_log_entry(
                     user_db_url=config.user_db_url,
-                    error_manager=config.error_manager
+                    error_manager=config.error_manager,
+                    flow_manager=config.flow_manager
                 )
                 print(json.dumps(log_entry), flush=True)
                 time.sleep(random.uniform(config.min_interval, config.max_interval))
@@ -391,7 +391,8 @@ def run_log_generator(config: LogGeneratorConfig):
                         user_db_url=config.user_db_url,
                         uri=uri,
                         flow_context=flow_context,
-                        error_manager=config.error_manager
+                        error_manager=config.error_manager,
+                        flow_manager=config.flow_manager
                     )
                     print(json.dumps(log_entry), flush=True)
                     time.sleep(config.flow_manager.get_step_delay())
@@ -419,7 +420,8 @@ def run_log_generator(config: LogGeneratorConfig):
                                 user_db_url=config.user_db_url,
                                 uri=uri,
                                 flow_context=flow_context,
-                                error_manager=config.error_manager
+                                error_manager=config.error_manager,
+                                flow_manager=config.flow_manager
                             )
                             print(json.dumps(log_entry), flush=True)
                             time.sleep(config.flow_manager.get_step_delay())
@@ -427,7 +429,8 @@ def run_log_generator(config: LogGeneratorConfig):
                             # Flow was abandoned immediately, generate random
                             log_entry = generate_log_entry(
                                 user_db_url=config.user_db_url,
-                                error_manager=config.error_manager
+                                error_manager=config.error_manager,
+                                flow_manager=config.flow_manager
                             )
                             print(json.dumps(log_entry), flush=True)
                             time.sleep(random.uniform(config.min_interval, config.max_interval))
@@ -435,7 +438,8 @@ def run_log_generator(config: LogGeneratorConfig):
                         # Fallback to random if no flows configured
                         log_entry = generate_log_entry(
                             user_db_url=config.user_db_url,
-                            error_manager=config.error_manager
+                            error_manager=config.error_manager,
+                            flow_manager=config.flow_manager
                         )
                         print(json.dumps(log_entry), flush=True)
                         time.sleep(random.uniform(config.min_interval, config.max_interval))

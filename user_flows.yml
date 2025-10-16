@@ -130,6 +130,51 @@ flows:
       - /support/tickets/:ticket_id
       - /support/chat
 
+# HTTP Method Mapping
+# Maps URI patterns to HTTP methods
+# Patterns are matched using substring matching
+# If a URI matches multiple patterns, the first match is used
+# If no match is found, defaults to GET
+method_mapping:
+  # Authentication & Login
+  /login: POST
+  /logout: POST
+  /register: POST
+  /auth: POST
+  
+  # Cart Operations
+  /add_to_cart: POST
+  /cart/update: PUT
+  /cart/remove: DELETE
+  
+  # Wishlist Operations
+  /add_to_wishlist: POST
+  /wishlist/remove: DELETE
+  
+  # Checkout & Orders
+  /checkout: POST
+  /checkout/payment: POST
+  /checkout/confirm: POST
+  
+  # Profile Updates
+  /profile/update: PUT
+  /profile/settings: PUT
+  /settings: PUT
+  
+  # Support & Tickets
+  /support/tickets/create: POST
+  /support/chat: POST
+  
+  # Delete Operations
+  /delete: DELETE
+  /remove: DELETE
+  
+  # Update Operations
+  /update: PUT
+  /edit: PUT
+  
+  # All other URIs default to GET
+
 # Placeholder value generators
 # These define how to generate values for placeholders
 placeholders:

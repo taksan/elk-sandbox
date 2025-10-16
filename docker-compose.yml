@@ -1,7 +1,4 @@
 # docker-compose.yml
-
-version: '3.8'
-
 services:
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2
@@ -53,18 +50,18 @@ services:
     networks:
       - elk_net
 
-  log-generator:
+  traffic-generator:
     build:
-      context: ./log-generator
+      context: ./traffic-generator
       dockerfile: Dockerfile
-    container_name: log_generator
+    container_name: traffic_generator
     restart: on-failure
     ports:
       - "8000:8000"
     volumes:
       - ./user_flows.yml:/app/user_flows.yml:ro
     # --- UPDATE depends_on ---
-    # Log-generator should wait for Logstash to be ready
+    # Traffic generator should wait for Logstash to be ready
     depends_on:
       logstash:
         condition: service_started # No healthcheck needed here, just start order
@@ -76,7 +73,7 @@ services:
       driver: gelf
       options:
         gelf-address: "udp://localhost:12201"
-        tag: "log-generator"
+        tag: "traffic-generator"
 
   user-database:
     build:

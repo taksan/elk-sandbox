@@ -90,7 +90,7 @@ Each request generates a log entry in JSON format:
 
 ## Integration
 
-The user database integrates with the log generator:
+The user database integrates with the traffic generator:
 1. Log generator calls `/user/random` to get users
 2. User database logs each request to `/data/user_database.log`
 3. Filebeat collects logs and sends to Logstash

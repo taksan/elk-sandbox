@@ -1,6 +1,6 @@
-# ELK Stack with Log Generator
+# ELK Stack with Advanced Traffic Generation
 
-A complete ELK (Elasticsearch, Logstash, Kibana) stack setup with a custom log generator that produces geographically distributed web application logs.
+A complete ELK (Elasticsearch, Logstash, Kibana) stack with an advanced traffic generator featuring realistic user flows, error simulation, and real-time traffic control.
 
 ## Overview
 
@@ -18,7 +18,7 @@ This project provides a ready-to-use logging infrastructure that:
 
 ```
 ┌─────────────────────────┐
-│    Log Generator        │ ──(GELF/UDP)──┐
+│   Traffic Generator     │ ──(GELF/UDP)──┐
 │  Port 8000 (API)        │                │
 └─────────────────────────┘                │
          ▲                                 ▼
@@ -53,7 +53,7 @@ This will start all services:
 - **Elasticsearch** on port 9200
 - **Logstash** on ports 5044 (Beats) and 12201 (UDP/GELF)
 - **Kibana** on port 5601
-- **Log Generator** on port 8000 (API)
+- **Traffic Generator** on port 8000 (API)
 - **User Database** on port 8500 (API)
 - **Filebeat** (collects user database logs)
 
@@ -87,7 +87,7 @@ Wait a few moments for Kibana to initialize (usually 30-60 seconds).
 2. Select the `webapp-logs-*` index pattern
 3. You should see logs flowing in real-time
 
-### 5. Try the Log Generator API (Optional)
+### 5. Try the Traffic Generator API (Optional)
 
 Test the management API:
 ```bash
@@ -130,9 +130,9 @@ curl http://localhost:8000/
 - **Purpose**: Visualization and exploration interface
 - **URL**: http://localhost:5601
 
-### Log Generator
+### Traffic Generator
 - **Port**: 8000 (Management API)
-- **Purpose**: Generates realistic web application logs
+- **Purpose**: Generates realistic web application traffic and logs
 - **Log Format**: JSON with structured fields
 - **User Management**: Fetches users from User Database service
 - **User Flows**: Simulates realistic user journeys (see `USER_FLOWS.md`)
@@ -221,9 +221,9 @@ User database logs have a simpler structure:
 - `returned_existing` - An existing user was returned
 - `returned_existing_max_reached` - Max users (100) reached, returned existing user
 
-## Log Generator API
+## Traffic Generator API
 
-The log generator exposes a REST API on port 8000 for runtime configuration and simulation.
+The traffic generator exposes a REST API on port 8000 for runtime configuration and simulation.
 
 ### API Endpoints
 
@@ -367,13 +367,13 @@ docker-compose down -v
 ### Restart a Specific Service
 ```bash
 docker-compose restart logstash
-docker-compose restart log-generator
+docker-compose restart traffic-generator
 ```
 
-### Rebuild Log Generator
-If you modify the log generator code:
+### Rebuild Traffic Generator
+If you modify the traffic generator code:
 ```bash
-docker-compose up --build -d log-generator
+docker-compose up --build -d traffic-generator
 ```
 
 ### Check Service Health
@@ -465,13 +465,14 @@ docker-compose logs <service-name>
 - `user_flows.yml` - **User flow definitions** (customize user journeys)
 - `logstash/pipeline/logstash.conf` - Logstash pipeline configuration
 - `filebeat/filebeat.yml` - Filebeat configuration
-- `log-generator/log_generator.py` - Core log generation logic
-- `log-generator/flow_manager.py` - User flow state machine manager
-- `log-generator/api.py` - FastAPI application for management
-- `log-generator/Dockerfile` - Log generator container image
-- `log-generator/requirements.txt` - Python dependencies
+- `traffic-generator/` - Traffic generation service
+  - `traffic_generator.py` - Core log generation logic
+  - `flow_manager.py` - User flow state machine manager
+  - `api.py` - FastAPI application for management
+  - `Dockerfile` - Traffic generator container image
+  - `requirements.txt` - Python dependencies
 - `user-database/app.py` - User database Flask application
-- `user-database/Dockerfile` - User database container image
+{{ ... }}
 - `user-database/requirements.txt` - User database Python dependencies
 - `remove-volumes.sh` - Script to clean up volumes
 - `traffic-start.sh` - Script to start traffic generation
@@ -485,6 +486,7 @@ docker-compose logs <service-name>
 - 📖 `README.md` - This file (main documentation)
 - 🚀 `QUICK_REFERENCE.md` - **Quick reference card** (start here!)
 - 🔄 `USER_FLOWS.md` - User flow system documentation
+- 🎯 `METHOD_MAPPING.md` - HTTP method mapping configuration
 - 🎮 `TRAFFIC_CONTROL.md` - Traffic control API guide
 - 📊 `IMPLEMENTATION_SUMMARY.md` - Complete implementation overview
 - 🗂️ `FLOW_SYSTEM_SUMMARY.md` - Flow system technical details
@@ -568,8 +570,8 @@ docker-compose down
 # View logs
 docker-compose logs -f
 
-# Rebuild log generator
-docker-compose up --build -d log-generator
+# Rebuild traffic generator
+docker-compose up --build -d traffic-generator
 
 # Remove all data
 ./remove-volumes.sh
@@ -590,7 +592,7 @@ docker-compose up --build -d log-generator
 ```
 
 ### API Endpoints
-- **Log Generator API**: http://localhost:8000/docs
+- **Traffic Generator API**: http://localhost:8000/docs
 - **User Database API**: http://localhost:8500/health
 - **Kibana**: http://localhost:5601
 - **Elasticsearch**: http://localhost:9200
@@ -603,7 +605,7 @@ curl http://localhost:9200/_cluster/health?pretty
 # List indices
 curl http://localhost:9200/_cat/indices?v
 
-# Check log generator status
+# Check traffic generator status
 curl http://localhost:8000/status
 
 # Check user database

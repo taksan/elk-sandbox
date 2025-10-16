@@ -90,6 +90,7 @@ class FlowManager:
         self.config_path = config_path
         self.flows_config = {}
         self.placeholder_config = {}
+        self.method_mapping = {}
         self.config = {}
         self.active_flows: List[FlowStateMachine] = []
         self.load_config()
@@ -101,8 +102,10 @@ class FlowManager:
                 data = yaml.safe_load(f)
                 self.flows_config = data.get('flows', {})
                 self.placeholder_config = data.get('placeholders', {})
+                self.method_mapping = data.get('method_mapping', {})
                 self.config = data.get('config', {})
                 print(f"Loaded {len(self.flows_config)} flow definitions", flush=True)
+                print(f"Loaded {len(self.method_mapping)} method mappings", flush=True)
         except Exception as e:
             print(f"Error loading flow config: {e}", flush=True)
             # Use defaults if config fails to load
@@ -200,3 +203,26 @@ class FlowManager:
             flow for flow in self.active_flows
             if (now - flow.started_at).total_seconds() < max_age_seconds
         ]
+    
+    def get_http_method(self, uri: str) -> str:
+        """
+        Get HTTP method for a URI based on method_mapping.
+        Returns the method if a pattern matches, otherwise returns 'GET'.
+        
+        Args:
+            uri: The URI path to check
+            
+        Returns:
+            HTTP method (GET, POST, PUT, DELETE, etc.)
+        """
+        if not uri or not self.method_mapping:
+            return 'GET'
+        
+        # Check each pattern in method_mapping
+        # Patterns are matched using substring matching
+        for pattern, method in self.method_mapping.items():
+            if pattern in uri:
+                return method
+        
+        # Default to GET if no match found
+        return 'GET'
