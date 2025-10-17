@@ -93,6 +93,25 @@ services:
       timeout: 5s
       retries: 5
 
+  server-assignment:
+    build:
+      context: ./server-assignment
+      dockerfile: Dockerfile
+    container_name: server_assignment
+    restart: on-failure
+    ports:
+      - "8100:8100"
+    volumes:
+      - ./geo_servers.geojson:/app/geo_servers.geojson:ro
+      - server_assignment_logs:/var/log/server-assignment
+    networks:
+      - elk_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8100/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   filebeat:
     image: docker.elastic.co/beats/filebeat:8.12.2
     container_name: filebeat
@@ -100,11 +119,14 @@ services:
     volumes:
       - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
       - user_data:/data:ro
+      - server_assignment_logs:/var/log/server-assignment:ro
       - filebeat_data:/usr/share/filebeat/data
     depends_on:
       logstash:
         condition: service_started
       user-database:
+        condition: service_started
+      server-assignment:
         condition: service_started
     networks:
       - elk_net
@@ -118,6 +140,8 @@ volumes:
   es_data:
     driver: local
   user_data:
+    driver: local
+  server_assignment_logs:
     driver: local
   filebeat_data:
     driver: local

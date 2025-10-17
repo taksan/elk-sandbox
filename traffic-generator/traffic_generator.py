@@ -3,6 +3,7 @@
 import time
 import json
 import random
+import uuid
 from datetime import datetime
 from faker import Faker
 import requests
@@ -10,6 +11,19 @@ from flow_manager import FlowManager
 from error_manager import ErrorManager
 
 fake = Faker()
+
+# Load geo_servers configuration
+def load_geo_servers():
+    """Load geographic server configuration from geojson file."""
+    try:
+        with open('/app/geo_servers.geojson', 'r') as f:
+            data = json.load(f)
+            return data['features']
+    except Exception as e:
+        print(f"Warning: Could not load geo_servers.geojson: {e}", flush=True)
+        return []
+
+GEO_SERVERS = load_geo_servers()
 
 
 class LogGeneratorConfig:
@@ -235,10 +249,12 @@ def generate_log_entry(override_ip=None, user_db_url=None, uri=None, flow_contex
         user_agent = flow_context.get('user_agent')
         user_id = flow_context.get('user_id')
         user_name = flow_context.get('user_name')
+        session_id = flow_context.get('session_id')  # Get session_id from flow
     else:
         client_ip = override_ip if override_ip else generate_distributed_ip()
         user_agent = fake.user_agent()
         user_id, user_name = fetch_user_from_db(user_db_url) if user_db_url else (None, fake.user_name())
+        session_id = str(uuid.uuid4())  # Generate random session_id for anonymous requests
     
     # Determine HTTP method based on URI
     if uri:
@@ -287,6 +303,7 @@ def generate_log_entry(override_ip=None, user_db_url=None, uri=None, flow_contex
         "client_ip": client_ip,
         "user_id": user_id,
         "user_name": user_name,
+        "session_id": session_id,
         "http": {
             "request": {
                 "method": method,

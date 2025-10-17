@@ -1,0 +1,149 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "properties": {
+          "region": "us-east-1",
+          "server_name": "srv-us-east-1",
+          "provider": "AWS",
+          "ip_range": "50.16.0.0-50.19.255.255"
+        },
+        "geometry": {
+          "type": "Point",
+          "coordinates": [-77.0369, 38.9072]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "region": "us-west-1",
+          "server_name": "srv-us-west-1",
+          "provider": "AWS",
+          "ip_range": "204.236.128.0-204.236.255.255"
+        },
+        "geometry": {
+          "type": "Point",
+          "coordinates": [-122.4194, 37.7749]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "region": "sa-east-1",
+          "server_name": "srv-sa-east-1",
+          "provider": "AWS",
+          "ip_range": "177.71.128.0-177.71.255.255"
+        },
+        "geometry": {
+          "type": "Point",
+          "coordinates": [-46.6333, -23.5505]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "region": "eu-west-1",
+          "server_name": "srv-eu-west-1",
+          "provider": "AWS",
+          "ip_range": "46.51.128.0-46.51.255.255"
+        },
+        "geometry": {
+          "type": "Point",
+          "coordinates": [-6.2603, 53.3498]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "region": "eu-central-1",
+          "server_name": "srv-eu-central-1",
+          "provider": "AWS",
+          "ip_range": "3.120.0.0-3.127.255.255"
+        },
+        "geometry": {
+          "type": "Point",
+          "coordinates": [8.6821, 50.1109]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "region": "ap-southeast-1",
+          "server_name": "srv-ap-southeast-1",
+          "provider": "AWS",
+          "ip_range": "13.212.0.0-13.215.255.255"
+        },
+        "geometry": {
+          "type": "Point",
+          "coordinates": [103.8198, 1.3521]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "region": "ap-southeast-2",
+          "server_name": "srv-ap-southeast-2",
+          "provider": "AWS",
+          "ip_range": "13.54.0.0-13.55.255.255"
+        },
+        "geometry": {
+          "type": "Point",
+          "coordinates": [151.2093, -33.8688]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "region": "ap-northeast-1",
+          "server_name": "srv-ap-northeast-1",
+          "provider": "AWS",
+          "ip_range": "13.112.0.0-13.115.255.255"
+        },
+        "geometry": {
+          "type": "Point",
+          "coordinates": [139.6917, 35.6895]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "region": "ca-central-1",
+          "server_name": "srv-ca-central-1",
+          "provider": "AWS",
+          "ip_range": "35.182.0.0-35.183.255.255"
+        },
+        "geometry": {
+          "type": "Point",
+          "coordinates": [-73.5673, 45.5017]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "region": "me-central-1",
+          "server_name": "srv-me-central-1",
+          "provider": "AWS",
+          "ip_range": "157.175.0.0-157.175.255.255"
+        },
+        "geometry": {
+          "type": "Point",
+          "coordinates": [55.2708, 25.2048]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "region": "af-south-1",
+          "server_name": "srv-af-south-1",
+          "provider": "AWS",
+          "ip_range": "13.244.0.0-13.245.255.255"
+        },
+        "geometry": {
+          "type": "Point",
+          "coordinates": [18.4241, -33.9249]
+        }
+      }
+    ]
+  }
+  

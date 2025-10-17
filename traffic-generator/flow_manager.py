@@ -3,6 +3,8 @@ Flow Manager - Manages user flow state machines
 """
 import random
 import yaml
+import uuid
+import requests
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from faker import Faker
@@ -21,6 +23,8 @@ class FlowStateMachine:
         self.placeholder_config = placeholder_config
         self.placeholder_values = {}
         self.started_at = datetime.utcnow()
+        # Generate a unique session ID for this flow
+        self.session_id = str(uuid.uuid4())
         
     def get_next_step(self) -> Optional[str]:
         """Get the next step in the flow and advance."""
@@ -86,8 +90,9 @@ class FlowStateMachine:
 class FlowManager:
     """Manages multiple concurrent user flows."""
     
-    def __init__(self, config_path: str = '/app/user_flows.yml'):
+    def __init__(self, config_path: str = '/app/user_flows.yml', server_assignment_url: str = "http://server-assignment:8100"):
         self.config_path = config_path
+        self.server_assignment_url = server_assignment_url
         self.flows_config = {}
         self.placeholder_config = {}
         self.method_mapping = {}
@@ -123,6 +128,27 @@ class FlowManager:
         random_pct = self.config.get('random_request_percentage', 30)
         return random.random() * 100 < random_pct
     
+    def assign_server_to_session(self, session_id: str, client_ip: Optional[str] = None, user_id: Optional[int] = None) -> Optional[Dict]:
+        """Assign a server to a session via the server-assignment API."""
+        try:
+            response = requests.post(
+                f"{self.server_assignment_url}/assign",
+                json={
+                    "session_id": session_id,
+                    "client_ip": client_ip,
+                    "user_id": user_id
+                },
+                timeout=2
+            )
+            if response.status_code == 200:
+                return response.json()
+            else:
+                print(f"Server assignment failed: {response.status_code}", flush=True)
+                return None
+        except Exception as e:
+            print(f"Error assigning server: {e}", flush=True)
+            return None
+    
     def start_new_flow(self, client_ip: str, user_agent: str, user_id: Optional[int], user_name: Optional[str]) -> FlowStateMachine:
         """Start a new flow with consistent user context."""
         if not self.flows_config:
@@ -131,6 +157,21 @@ class FlowManager:
         # Select flow based on weights
         flow_name = self._select_weighted_flow()
         flow_def = self.flows_config[flow_name]
+        
+        # Create flow to get session_id
+        flow = FlowStateMachine(
+            flow_name=flow_name,
+            steps=flow_def['steps'],
+            user_context={},  # Will be populated below
+            placeholder_config=self.placeholder_config
+        )
+        
+        # Assign server to this session
+        server_assignment = self.assign_server_to_session(
+            session_id=flow.session_id,
+            client_ip=client_ip,
+            user_id=user_id
+        )
         
         # Create user context that will be consistent throughout the flow
         user_context = {
@@ -141,12 +182,8 @@ class FlowManager:
             'flow_name': flow_name
         }
         
-        flow = FlowStateMachine(
-            flow_name=flow_name,
-            steps=flow_def['steps'],
-            user_context=user_context,
-            placeholder_config=self.placeholder_config
-        )
+        # Update flow context
+        flow.user_context = user_context
         
         self.active_flows.append(flow)
         return flow
@@ -184,7 +221,11 @@ class FlowManager:
             if next_step is None:
                 return None
         
-        return (next_step, flow.user_context)
+        # Include session_id in the context
+        context_with_session = flow.user_context.copy()
+        context_with_session['session_id'] = flow.session_id
+        
+        return (next_step, context_with_session)
     
     def get_step_delay(self) -> float:
         """Get delay between flow steps."""

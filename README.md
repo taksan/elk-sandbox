@@ -54,8 +54,9 @@ This will start all services:
 - **Logstash** on ports 5044 (Beats) and 12201 (UDP/GELF)
 - **Kibana** on port 5601
 - **Traffic Generator** on port 8000 (API)
+- **Server Assignment** on port 8100 (API)
 - **User Database** on port 8500 (API)
-- **Filebeat** (collects user database logs)
+- **Filebeat** (collects logs from user database and server assignment)
 
 ### 2. Access Kibana
 
@@ -487,6 +488,8 @@ docker-compose logs <service-name>
 - 🚀 `QUICK_REFERENCE.md` - **Quick reference card** (start here!)
 - 🔄 `USER_FLOWS.md` - User flow system documentation
 - 🎯 `METHOD_MAPPING.md` - HTTP method mapping configuration
+- 🔗 `SESSION_TRACKING.md` - Session ID tracking and analytics
+- 🌍 `SERVER_ASSIGNMENT.md` - Server assignment system and geographic distribution
 - 🎮 `TRAFFIC_CONTROL.md` - Traffic control API guide
 - 📊 `IMPLEMENTATION_SUMMARY.md` - Complete implementation overview
 - 🗂️ `FLOW_SYSTEM_SUMMARY.md` - Flow system technical details

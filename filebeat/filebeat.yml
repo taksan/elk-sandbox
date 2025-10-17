@@ -9,6 +9,16 @@ filebeat.inputs:
       log_type: user_database
     fields_under_root: true
 
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/server-assignment/assignments.log
+    json.keys_under_root: true
+    json.add_error_key: true
+    fields:
+      log_type: server_assignment
+    fields_under_root: true
+
 output.logstash:
   hosts: ["logstash:5044"]
 
