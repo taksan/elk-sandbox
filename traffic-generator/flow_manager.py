@@ -4,6 +4,7 @@ Flow Manager - Manages user flow state machines
 import random
 import yaml
 import uuid
+import sys
 import requests
 from datetime import datetime
 from typing import Dict, List, Optional, Any
@@ -109,10 +110,10 @@ class FlowManager:
                 self.placeholder_config = data.get('placeholders', {})
                 self.method_mapping = data.get('method_mapping', {})
                 self.config = data.get('config', {})
-                print(f"Loaded {len(self.flows_config)} flow definitions", flush=True)
-                print(f"Loaded {len(self.method_mapping)} method mappings", flush=True)
+                print(f"Loaded {len(self.flows_config)} flow definitions", file=sys.stderr, flush=True)
+                print(f"Loaded {len(self.method_mapping)} method mappings", file=sys.stderr, flush=True)
         except Exception as e:
-            print(f"Error loading flow config: {e}", flush=True)
+            print(f"Error loading flow config: {e}", file=sys.stderr, flush=True)
             # Use defaults if config fails to load
             self.flows_config = {}
             self.placeholder_config = {}
@@ -143,13 +144,13 @@ class FlowManager:
             if response.status_code == 200:
                 return response.json()
             else:
-                print(f"Server assignment failed: {response.status_code}", flush=True)
+                print(f"Server assignment failed: {response.status_code}", file=sys.stderr, flush=True)
                 return None
         except Exception as e:
-            print(f"Error assigning server: {e}", flush=True)
+            print(f"Error assigning server: {e}", file=sys.stderr, flush=True)
             return None
     
-    def start_new_flow(self, client_ip: str, user_agent: str, user_id: Optional[int], user_name: Optional[str]) -> FlowStateMachine:
+    def start_new_flow(self, client_ip: str, user_agent: str, user_id: Optional[int], user_name: Optional[str], geocode: Optional[Dict] = None) -> FlowStateMachine:
         """Start a new flow with consistent user context."""
         if not self.flows_config:
             return None
@@ -181,6 +182,10 @@ class FlowManager:
             'user_name': user_name,
             'flow_name': flow_name
         }
+        
+        # Add geocode if provided
+        if geocode:
+            user_context['geocode'] = geocode
         
         # Update flow context
         flow.user_context = user_context
