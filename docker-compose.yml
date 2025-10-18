@@ -1,4 +1,9 @@
 # docker-compose.yml
+include:
+  - path: fake-traffic-generator/docker-compose.yml
+    env_file: .env
+
+
 services:
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2
@@ -52,76 +57,13 @@ services:
     networks:
       - elk_net
 
-  traffic-generator:
-    build:
-      context: ./fake-traffic-generator/traffic-generator
-      dockerfile: Dockerfile
-    container_name: traffic_generator
-    restart: on-failure
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./user_flows.yml:/app/user_flows.yml:ro
-    # --- UPDATE depends_on ---
-    # Traffic generator should wait for Logstash to be ready
-    depends_on:
-      logstash:
-        condition: service_started # No healthcheck needed here, just start order
-      user-database:
-        condition: service_started
-    networks:
-      - elk_net
-    logging:
-      driver: gelf
-      options:
-        gelf-address: "udp://localhost:12201"
-        tag: "traffic-generator"
-
-  user-database:
-    build:
-      context: ./fake-user-database/user-database
-      dockerfile: Dockerfile
-    container_name: user_database
-    restart: on-failure
-    ports:
-      - "8500:8500"
-    volumes:
-      - user_data:/data
-    networks:
-      - elk_net
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8500/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  server-assignment:
-    build:
-      context: ./fake-server-assignment/server-assignment
-      dockerfile: Dockerfile
-    container_name: server_assignment
-    restart: on-failure
-    ports:
-      - "8100:8100"
-    volumes:
-      - ./geo_servers.geojson:/app/geo_servers.geojson:ro
-      - server_assignment_logs:/var/log/server-assignment
-    networks:
-      - elk_net
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8100/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   filebeat:
     image: docker.elastic.co/beats/filebeat:8.12.2
     container_name: filebeat
     user: root
     volumes:
       - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
-      - user_data:/data:ro
-      - server_assignment_logs:/var/log/server-assignment:ro
+      - traffic_generator_logs:/var/log/traffic-generator:ro
       - filebeat_data:/usr/share/filebeat/data
     depends_on:
       logstash:
@@ -158,10 +100,6 @@ networks:
 
 volumes:
   es_data:
-    driver: local
-  user_data:
-    driver: local
-  server_assignment_logs:
     driver: local
   filebeat_data:
     driver: local

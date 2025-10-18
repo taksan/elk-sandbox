@@ -2,7 +2,7 @@ filebeat.inputs:
   - type: log
     enabled: true
     paths:
-      - /data/user_database.log
+      - /var/log/traffic-generator/user_database.log
     json.keys_under_root: true
     json.add_error_key: true
     fields:
@@ -12,7 +12,7 @@ filebeat.inputs:
   - type: log
     enabled: true
     paths:
-      - /var/log/server-assignment/assignments.log
+      - /var/log/traffic-generator/server-assignments.log
     json.keys_under_root: true
     json.add_error_key: true
     fields:
