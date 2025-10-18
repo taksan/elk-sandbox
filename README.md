@@ -43,7 +43,18 @@ This project provides a ready-to-use logging infrastructure that:
 
 ## Quick Start
 
-### 1. Start the Stack
+### 1. Initialize Submodules
+
+This project uses a Git submodule for the traffic generator. After cloning the repository, initialize the submodule:
+
+```bash
+# Initialize and clone the submodule
+git submodule update --init --recursive
+```
+
+If you've already cloned the repository without the `--recursive` flag, run the command above to fetch the submodule content.
+
+### 2. Start the Stack
 
 ```bash
 docker-compose up -d
@@ -58,7 +69,7 @@ This will start all services:
 - **User Database** on port 8500 (API)
 - **Filebeat** (collects logs from user database and server assignment)
 
-### 2. Access Kibana
+### 3. Access Kibana
 
 Open your browser and navigate to:
 ```
@@ -67,7 +78,7 @@ http://localhost:5601
 
 Wait a few moments for Kibana to initialize (usually 30-60 seconds).
 
-### 3. Create Data Views
+### 4. Create Data Views
 
 **For Web Application Logs:**
 1. In Kibana, go to **Management** → **Stack Management** → **Data Views**
@@ -82,29 +93,24 @@ Wait a few moments for Kibana to initialize (usually 30-60 seconds).
 3. Select `@timestamp` as the time field
 4. Click **Save data view**
 
-### 4. View Logs
+### 5. View Logs
 
 1. Go to **Analytics** → **Discover**
 2. Select the `webapp-logs-*` index pattern
 3. You should see logs flowing in real-time
 
-### 5. Try the Traffic Generator API (Optional)
+### 6. Control Traffic Generation (Optional)
 
-Test the management API:
+The traffic generator provides scripts for controlling log generation. For detailed API documentation, see [fake-traffic-generator/README.md](fake-traffic-generator/README.md).
+
 ```bash
 # Check API status
 curl http://localhost:8000/
 
 # Control traffic generation
-./traffic-stop.sh       # Stop traffic
-./traffic-start.sh      # Start traffic
-./traffic-status.sh     # Check status
-
-# Speed up log generation
-./update-interval.sh 0.1 0.3
-
-# Simulate a 30-second DDoS attack from Asia
-./simulate-ddos.sh 30 Asia
+./fake-traffic-generator/traffic-start.sh
+./fake-traffic-generator/traffic-stop.sh
+./fake-traffic-generator/traffic-status.sh
 ```
 
 ## Services
@@ -134,35 +140,19 @@ curl http://localhost:8000/
 ### Traffic Generator
 - **Port**: 8000 (Management API)
 - **Purpose**: Generates realistic web application traffic and logs
-- **Log Format**: JSON with structured fields
-- **User Management**: Fetches users from User Database service
-- **User Flows**: Simulates realistic user journeys (see `USER_FLOWS.md`)
-  - Purchase flows
-  - Browse-only sessions
-  - Profile management
-  - Support interactions
-  - Abandoned carts
-  - 30% random traffic, 70% flow-based
-- **Geographic Distribution**: 
-  - Europe: 20%
-  - Asia: 20%
-  - South America: 20%
-  - Africa: 20%
-  - Australia/Oceania: 10%
-  - North America: 10%
-- **Log Rate**: ~1-5 logs per second (configurable via API)
+- **Features**: User flows, geographic distribution, DDoS simulation
 - **API Documentation**: http://localhost:8000/docs
+- **Full Documentation**: See [fake-traffic-generator/README.md](fake-traffic-generator/README.md)
 
 ### User Database
 - **Port**: 8500 (API)
 - **Purpose**: Manages up to 100 users for log generation
-- **Storage**: Persistent JSON file in Docker volume
-- **Logging**: Logs all requests to file for Filebeat collection
-- **Endpoints**:
-  - `GET /user/random` - Get or create a user
-  - `GET /users` - List all users
-  - `GET /health` - Health check
-  - `POST /users/reset` - Reset all users
+- **Full Documentation**: See [fake-traffic-generator/README.md](fake-traffic-generator/README.md)
+
+### Server Assignment
+- **Port**: 8100 (API)
+- **Purpose**: Assigns users to geographic servers
+- **Full Documentation**: See [fake-traffic-generator/README.md](fake-traffic-generator/README.md)
 
 ### Filebeat
 - **Purpose**: Collects logs from User Database service
@@ -172,169 +162,21 @@ curl http://localhost:8000/
 
 ## Log Structure
 
-Each generated log entry contains:
-
-```json
-{
-  "timestamp": "2025-10-15T19:00:00.000Z",
-  "level": "INFO",
-  "client_ip": "177.123.45.67",
-  "user_id": "user_42",
-  "http": {
-    "request": {
-      "method": "GET",
-      "referrer": "https://example.com"
-    },
-    "response": {
-      "status_code": 200,
-      "bytes": 12345
-    },
-    "url": "/products/example/1234",
-    "version": "1.1"
-  },
-  "user_agent": {
-    "original": "Mozilla/5.0..."
-  },
-  "message": "GET /products/example/1234 - 200"
-}
-```
-
-After Logstash processing, additional fields are added:
+Logs are generated in JSON format and sent via GELF to Logstash. After processing, they are enriched with:
 - `client.geo.*` - Geographic information (country, city, coordinates)
 - `user_agent.parsed.*` - Parsed browser and OS information
 
-### User Database Log Structure
-
-User database logs have a simpler structure:
-
-```json
-{
-  "timestamp": "2025-10-15T19:00:00.000Z",
-  "service": "user-database",
-  "action": "created_new",
-  "user_id": 42,
-  "user_name": "John Doe"
-}
-```
-
-**Actions:**
-- `created_new` - A new user was created
-- `returned_existing` - An existing user was returned
-- `returned_existing_max_reached` - Max users (100) reached, returned existing user
+For detailed log structure and examples, see [fake-traffic-generator/README.md](fake-traffic-generator/README.md).
 
 ## Traffic Generator API
 
 The traffic generator exposes a REST API on port 8000 for runtime configuration and simulation.
 
-### API Endpoints
+For complete API documentation including all endpoints, parameters, and examples, see [fake-traffic-generator/README.md](fake-traffic-generator/README.md).
 
-#### GET /
-Get API status and current configuration.
-
-```bash
-curl http://localhost:8000/
-```
-
-#### GET /status
-Get detailed generator status including DDoS simulation state and active flows.
-
-```bash
-curl http://localhost:8000/status
-```
-
-#### POST /traffic/start
-Start traffic generation.
-
-```bash
-curl -X POST http://localhost:8000/traffic/start
-# Or use the script
-./traffic-start.sh
-```
-
-#### POST /traffic/stop
-Stop traffic generation.
-
-```bash
-curl -X POST http://localhost:8000/traffic/stop
-# Or use the script
-./traffic-stop.sh
-```
-
-#### POST /traffic/pause
-Pause traffic generation (alias for stop).
-
-```bash
-curl -X POST http://localhost:8000/traffic/pause
-```
-
-#### POST /traffic/resume
-Resume traffic generation (alias for start).
-
-```bash
-curl -X POST http://localhost:8000/traffic/resume
-```
-
-#### POST /update_interval
-Update the log generation interval (time between log entries).
-
-**Using the shell script:**
-```bash
-./update-interval.sh <min_interval> <max_interval>
-
-# Example: Generate logs every 0.1 to 0.5 seconds (faster)
-./update-interval.sh 0.1 0.5
-
-# Example: Generate logs every 1 to 3 seconds (slower)
-./update-interval.sh 1.0 3.0
-```
-
-**Using curl directly:**
-```bash
-curl -X POST http://localhost:8000/update_interval \
-  -H "Content-Type: application/json" \
-  -d '{"min_interval": 0.1, "max_interval": 0.5}'
-```
-
-#### POST /simulate_ddos
-Simulate a DDoS attack with thousands of requests from a single region.
-
-**Using the shell script:**
-```bash
-./simulate-ddos.sh <duration_seconds> [region]
-
-# Example: 30-second DDoS from random region
-./simulate-ddos.sh 30
-
-# Example: 60-second DDoS from Asia
-./simulate-ddos.sh 60 Asia
-```
-
-**Available regions:**
-- Europe
-- Asia
-- South America
-- Africa
-- Australia
-- North America
-
-**Using curl directly:**
-```bash
-# Random region
-curl -X POST http://localhost:8000/simulate_ddos \
-  -H "Content-Type: application/json" \
-  -d '{"duration_seconds": 30}'
-
-# Specific region
-curl -X POST http://localhost:8000/simulate_ddos \
-  -H "Content-Type: application/json" \
-  -d '{"duration_seconds": 60, "region": "Asia"}'
-```
-
-### Interactive API Documentation
-
-FastAPI provides automatic interactive documentation:
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+**Quick Links:**
+- **Interactive API Docs**: http://localhost:8000/docs
+- **Alternative Docs**: http://localhost:8000/redoc
 
 ## Common Operations
 
@@ -466,26 +308,19 @@ docker-compose logs <service-name>
 - `user_flows.yml` - **User flow definitions** (customize user journeys)
 - `logstash/pipeline/logstash.conf` - Logstash pipeline configuration
 - `filebeat/filebeat.yml` - Filebeat configuration
-- `traffic-generator/` - Traffic generation service
-  - `traffic_generator.py` - Core log generation logic
-  - `flow_manager.py` - User flow state machine manager
-  - `api.py` - FastAPI application for management
-  - `Dockerfile` - Traffic generator container image
-  - `requirements.txt` - Python dependencies
-- `user-database/app.py` - User database Flask application
-{{ ... }}
-- `user-database/requirements.txt` - User database Python dependencies
+- `metricbeat/metricbeat.yml` - Metricbeat configuration
+- `fake-traffic-generator/` - Traffic generation system (Git submodule)
+  - See [fake-traffic-generator/README.md](fake-traffic-generator/README.md) for details
 - `remove-volumes.sh` - Script to clean up volumes
-- `traffic-start.sh` - Script to start traffic generation
-- `traffic-stop.sh` - Script to stop traffic generation
-- `traffic-status.sh` - Script to check traffic status
-- `update-interval.sh` - Script to update log generation interval
-- `simulate-ddos.sh` - Script to simulate DDoS attacks
 
 ## Documentation
 
+### Main Documentation
 - 📖 `README.md` - This file (main documentation)
 - 🚀 `QUICK_REFERENCE.md` - **Quick reference card** (start here!)
+
+### Traffic Generator Documentation
+- 🚦 [fake-traffic-generator/README.md](fake-traffic-generator/README.md) - **Traffic generator system documentation**
 - 🔄 `USER_FLOWS.md` - User flow system documentation
 - 🎯 `METHOD_MAPPING.md` - HTTP method mapping configuration
 - 🔗 `SESSION_TRACKING.md` - Session ID tracking and analytics
@@ -497,26 +332,9 @@ docker-compose logs <service-name>
 
 ## Customization
 
-### Modify Log Generation Rate
+### Traffic Generator Customization
 
-**Recommended: Use the API** (no restart required):
-```bash
-./update-interval.sh 0.1 0.5
-```
-
-**Alternative: Edit code** (requires rebuild):
-Edit `log-generator/log_generator.py` and change the default values in the `LogGeneratorConfig` class:
-```python
-class LogGeneratorConfig:
-    def __init__(self):
-        self.min_interval = 0.2  # Change these
-        self.max_interval = 1.5  # Change these
-```
-Then rebuild: `docker-compose up --build -d log-generator`
-
-### Add Custom Fields to Logs
-
-Edit `log-generator/log_generator.py` in the `generate_log_entry()` function to add new fields to the `log_data` dictionary.
+For customizing log generation rate, user flows, geographic distribution, and other traffic generator settings, see [fake-traffic-generator/README.md](fake-traffic-generator/README.md).
 
 ### Change Index Pattern
 
@@ -529,10 +347,6 @@ output {
   }
 }
 ```
-
-### Adjust Geographic Distribution
-
-Edit the `ip_ranges` list in `log-generator/generate_logs.py` to add/remove IP ranges for different regions.
 
 ## Data Retention
 
@@ -580,18 +394,14 @@ docker-compose up --build -d traffic-generator
 ./remove-volumes.sh
 ```
 
-### Management Scripts
+### Traffic Control Scripts
 ```bash
-# Control traffic generation
-./traffic-start.sh      # Start/resume traffic generation
-./traffic-stop.sh       # Stop/pause traffic generation
-./traffic-status.sh     # Check current status
-
-# Update log generation speed
-./update-interval.sh <min> <max>
-
-# Simulate DDoS attack
-./simulate-ddos.sh <duration> [region]
+# Control traffic generation (see fake-traffic-generator/README.md for details)
+./fake-traffic-generator/traffic-start.sh
+./fake-traffic-generator/traffic-stop.sh
+./fake-traffic-generator/traffic-status.sh
+./fake-traffic-generator/update-interval.sh <min> <max>
+./fake-traffic-generator/simulate-ddos.sh <duration> [region]
 ```
 
 ### API Endpoints

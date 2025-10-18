@@ -14,3 +14,10 @@ xpack.security.encryptionKey: "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
 # Disable telemetry for development
 telemetry.enabled: false
 telemetry.optIn: false
+
+# Fleet/Package Registry configuration
+# Disable Fleet to avoid package registry warnings
+xpack.fleet.enabled: false
+
+# Alternatively, if you need Fleet, configure a custom registry URL
+# xpack.fleet.registryUrl: "https://epr.elastic.co"

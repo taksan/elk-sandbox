@@ -1,0 +1,69 @@
+metricbeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: false
+
+metricbeat.modules:
+# System module - collects host metrics
+- module: system
+  period: 10s
+  metricsets:
+    - cpu
+    - load
+    - memory
+    - network
+    - process
+    - process_summary
+    - socket_summary
+    - filesystem
+    - fsstat
+  process.include_top_n:
+    by_cpu: 5
+    by_memory: 5
+
+- module: system
+  period: 1m
+  metricsets:
+    - uptime
+
+# Docker module - collects container metrics
+- module: docker
+  period: 10s
+  hosts: ["unix:///var/run/docker.sock"]
+  metricsets:
+    - container
+    - cpu
+    - diskio
+    - healthcheck
+    - info
+    - memory
+    - network
+
+# Output to Elasticsearch
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+  index: "metricbeat-%{+yyyy.MM.dd}"
+
+# Setup template
+setup.template.name: "metricbeat"
+setup.template.pattern: "metricbeat-*"
+setup.ilm.enabled: false
+
+# Kibana configuration
+setup.kibana:
+  host: "http://kibana:5601"
+
+# Logging
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/metricbeat
+  name: metricbeat
+  keepfiles: 7
+  permissions: 0644
+
+# Processors
+processors:
+  - add_host_metadata:
+      netinfo.enabled: true
+  - add_docker_metadata: ~
+  - add_cloud_metadata: ~
