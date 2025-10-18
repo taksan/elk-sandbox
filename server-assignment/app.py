@@ -77,6 +77,42 @@ def ip_range_to_random_ip(ip_range: str) -> str:
         return "0.0.0.0"
 
 
+def get_city_name_from_region(region: str) -> str:
+    """Map AWS region to city name."""
+    region_to_city = {
+        "us-east-1": "Virginia",
+        "us-west-1": "San Francisco",
+        "sa-east-1": "São Paulo",
+        "eu-west-1": "Dublin",
+        "eu-central-1": "Frankfurt",
+        "ap-southeast-1": "Singapore",
+        "ap-southeast-2": "Sydney",
+        "ap-northeast-1": "Tokyo",
+        "ca-central-1": "Montreal",
+        "me-central-1": "Dubai",
+        "af-south-1": "Cape Town"
+    }
+    return region_to_city.get(region, "Unknown")
+
+
+def get_country_info_from_region(region: str) -> tuple:
+    """Map AWS region to country name and ISO code."""
+    region_to_country = {
+        "us-east-1": ("United States", "US"),
+        "us-west-1": ("United States", "US"),
+        "sa-east-1": ("Brazil", "BR"),
+        "eu-west-1": ("Ireland", "IE"),
+        "eu-central-1": ("Germany", "DE"),
+        "ap-southeast-1": ("Singapore", "SG"),
+        "ap-southeast-2": ("Australia", "AU"),
+        "ap-northeast-1": ("Japan", "JP"),
+        "ca-central-1": ("Canada", "CA"),
+        "me-central-1": ("United Arab Emirates", "AE"),
+        "af-south-1": ("South Africa", "ZA")
+    }
+    return region_to_country.get(region, ("Unknown", "XX"))
+
+
 def initialize_servers():
     """Initialize server list from geo_servers.geojson."""
     global servers
@@ -89,6 +125,10 @@ def initialize_servers():
         # Generate a random IP from the range
         server_ip = ip_range_to_random_ip(props['ip_range'])
         
+        # Get geocode information
+        country_name, country_code = get_country_info_from_region(props['region'])
+        city_name = get_city_name_from_region(props['region'])
+        
         server = {
             'server_name': props['server_name'],
             'server_ip': server_ip,
@@ -96,7 +136,16 @@ def initialize_servers():
             'provider': props['provider'],
             'coordinates': coords,
             'ip_range': props['ip_range'],
-            'session_count': 0
+            'session_count': 0,
+            'geocode': {
+                'location': {
+                    'lon': coords[0],
+                    'lat': coords[1]
+                },
+                'country_iso_code': country_code,
+                'country_name': country_name,
+                'city_name': city_name
+            }
         }
         servers.append(server)
     
@@ -189,13 +238,15 @@ async def assign_session(request: AssignmentRequest):
     # Create assignment
     assigned_at = datetime.utcnow().isoformat() + "Z"
     assignment = {
+        "log_type": "server_assignment",
         "session_id": session_id,
         "server_name": server['server_name'],
         "server_ip": server['server_ip'],
         "region": server['region'],
         "assigned_at": assigned_at,
         "client_ip": request.client_ip,
-        "user_id": request.user_id
+        "user_id": request.user_id,
+        "geocode": server['geocode']
     }
     
     # Store assignment
