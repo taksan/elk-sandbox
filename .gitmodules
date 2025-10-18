@@ -1,3 +1,3 @@
 [submodule "fake-traffic-generator"]
 	path = fake-traffic-generator
-	url = git@github.com:taksan/fake-traffic-generator.git
+	url = https://github.com/taksan/fake-traffic-generator.git
